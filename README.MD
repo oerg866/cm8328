@@ -1,6 +1,6 @@
 # CM8328
 
-(C) 2022 Eric "oerg866" Voirin
+(C) 2023 Eric Voirin (oerg866)
 ---
 
 `CM8328` is a DOS driver for **C-Media CM8328**-based ISA sound cards, such as the *Zoltrix Audio Plus 3200 V2 AV305* and the *Zoltrix Audio Plus 3200 Wave AV500*.
