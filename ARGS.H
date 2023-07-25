@@ -26,7 +26,7 @@
 
 typedef u8 arg_type;
 
-typedef bool (*arg_check_fn) (void *); /* The void* argument is a pointer to the value to check */
+typedef bool (*arg_check_fn) (const void *); /* The void* argument is a pointer to the value to check */
 
 typedef struct {
     const char     *prefix;         /* Prefix of the argument's value */

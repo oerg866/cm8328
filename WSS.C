@@ -33,6 +33,14 @@ typedef struct {
     const char *name;
 } valName;
 
+#define AUX_MUTE        0x80
+#define VOICE_MUTE      0x80
+#define VOICE_VOL_MASK  0x3F
+#define AUX_VOL_MASK    0x1F
+#define MIC_BOOST       0x20
+#define REC_VOL_MASK    0x0F
+#define REC_SRC_MASK    0xC0
+
 void wss_indirectRegWrite(u16 port, u8 idxReg, u8 value) {
     outportb(port+4, idxReg);
     outportb(port+5, value); 
@@ -41,6 +49,11 @@ void wss_indirectRegWrite(u16 port, u8 idxReg, u8 value) {
 u8 wss_indirectRegRead(u16 port, u8 idxReg) {
     outportb(port+4, idxReg);
     return inportb (port+5);
+}
+
+bool wss_isAccessible(u16 port) {
+    u8 tst = wss_indirectRegRead(port, 0x0C);
+    return tst != 0xFF;
 }
 
 void wss_setClockStereoReg(u16 port, u8 value) {
@@ -67,8 +80,6 @@ void wss_setMode2(u16 port, bool enable) {
     }
 
     wss_indirectRegWrite(port, 0x0C, val);
-
-    printf("Mode 2 en %02x\n", wss_indirectRegRead(port, 0x0C));
 }
 
 static void waitForCalibrationDone(u16 port) {
@@ -107,26 +118,24 @@ void wss_setupCodec(u16 port, bool stereo, bool pbEnable, bool recEnable) {
 }
 
 void wss_mixer_setInputSource (u16 port, u8 source) {
-    u8 l = wss_indirectRegRead(port, 0x00) & 0x3F;
-    u8 r = wss_indirectRegRead(port, 0x01) & 0x3F;
+    u8 l = wss_indirectRegRead(port, 0) & ~REC_SRC_MASK;
+    u8 r = wss_indirectRegRead(port, 1) & ~REC_SRC_MASK;
 
     assert (source < WSS_INPUT_COUNT);
 
-    wss_indirectRegWrite(port, 0x00, l | (source << 6));
-    wss_indirectRegWrite(port, 0x01, r | (source << 6));
+    wss_indirectRegWrite(port, 0, l | (source << 6));
+    wss_indirectRegWrite(port, 1, r | (source << 6));
 }
 
-/*void wss_mixer_setMicVol      (u16 port, bool mute, u8 left, u8 right) {
-//todo
-}
+u8 wss_mixer_getInputSource (u16 port) {
+    u8 l = wss_indirectRegRead(port, 0) & REC_SRC_MASK;
+    u8 r = wss_indirectRegRead(port, 1) & REC_SRC_MASK;
 
-void wss_mixer_setAuxVol      (u16 port, bool mute, u8 left, u8 right) {
-//todo
-}
+    /* we only support both channels on identical source */
+    assert (l == r);
 
-void wss_mixer_setLineVol     (u16 port, bool mute, u8 left, u8 right) {
-//todo
-}*/
+    return (l >> 6);
+}
 
 void wss_mixer_setMonitorVol  (u16 port, const wss_vol *vol) {
     /* Compared to regular mute bits, this is an *enable* flag! */
@@ -134,28 +143,143 @@ void wss_mixer_setMonitorVol  (u16 port, const wss_vol *vol) {
     wss_indirectRegWrite(port, 0x0D, v);
 }
 
-void wss_mixer_setOutputVol   (u16 port, const wss_vol *vol) {
-    wss_indirectRegWrite(port, 0x06, (vol->mute ? 0x80 : 00) | (63 - vol->l));
-    wss_indirectRegWrite(port, 0x07, (vol->mute ? 0x80 : 00) | (63 - vol->r));
+/* Voice vol is attenuation, not gain, so 63 - x is used here */
+void wss_mixer_setVoiceVol   (u16 port, const wss_vol *vol) {
+    u8 lreg = (vol->mute ? VOICE_MUTE : 00);// | (WSS_VOL_MAX - vol->l);
+    u8 rreg = (vol->mute ? VOICE_MUTE : 00);// | (WSS_VOL_MAX - vol->r);
+
+    /* volume */
+    
+    lreg |= (WSS_VOL_MAX - vol->l);
+    rreg |= (WSS_VOL_MAX - vol->r);
+    
+    wss_indirectRegWrite(port, 6, lreg);
+    wss_indirectRegWrite(port, 7, rreg);
 }
 
-void wss_mixer_getOutputVol   (u16 port, wss_vol *vol) {
-    u8 lreg = wss_indirectRegRead(port, 0x06);
-    u8 rreg = wss_indirectRegRead(port, 0x07);
+void wss_mixer_getVoiceVol   (u16 port, wss_vol *vol) {
+    u8 lreg = wss_indirectRegRead(port, 6);
+    u8 rreg = wss_indirectRegRead(port, 7);
 
-    bool lmute = (lreg & 0x80 == 0);
-    bool rmute = (rreg & 0x80 == 0);
+    bool lmute = (lreg & VOICE_MUTE) != 0;
+    bool rmute = (rreg & VOICE_MUTE) != 0;
 
     assert (lmute == rmute);
 
     vol->mute = lmute || rmute;
-    vol->l    = 63 - lreg & 0x3F;
-    vol->r    = 63 - rreg & 0x3F;
+    vol->l    = WSS_VOL_MAX - (lreg & VOICE_VOL_MASK);
+    vol->r    = WSS_VOL_MAX - (rreg & VOICE_VOL_MASK);
 }
 
-void wss_mixer_muteOutput     (u16 port, bool mute) {
+void setAuxVolGeneric(u16 port, u8 lIdx, u8 rIdx, const wss_vol *vol) {
+    u8 lreg = (vol->mute ? AUX_MUTE : 0x00);
+    u8 rreg = (vol->mute ? AUX_MUTE : 0x00);
+
+    /* volume, the higher the value, the quieter the sound */ 
+    /* Range is 0 to 31, so we shift it) */
+    lreg |= WSS_VOL_MAX - ((vol->l >> 1) & AUX_VOL_MASK);
+    rreg |= WSS_VOL_MAX - ((vol->r >> 1) & AUX_VOL_MASK);
+
+    wss_indirectRegWrite(port, lIdx, lreg);
+    wss_indirectRegWrite(port, rIdx, rreg);
+}
+
+void getAuxVolGeneric(u16 port, u8 lIdx, u8 rIdx,       wss_vol *vol) {
+    u8 lreg = wss_indirectRegRead(port, lIdx);
+    u8 rreg = wss_indirectRegRead(port, rIdx);
+
+    bool lmute = (lreg & AUX_MUTE) != 0;
+    bool rmute = (rreg & AUX_MUTE) != 0; 
+
+    /* Mute, only support both channels on same value */
+    assert(lmute == rmute);
+    vol->mute = lmute;
+
+    /* volume, the higher the value, the quieter the sound */
+    /* Range is 0 to 31, so we shift it) */
+    vol->l = 63 - ((lreg & AUX_VOL_MASK) << 1);
+    vol->r = 63 - ((rreg & AUX_VOL_MASK) << 1);
+
+    /* This gain is 0-31 so we need to shift it left. 
+       This would yield 62 for max volume so we set it to 63 in that case. */
+
+    if (vol->l == 62) vol->l = 63;
+    if (vol->r == 62) vol->r = 63;
+}
+
+void wss_mixer_setAux1Vol(u16 port, const wss_vol *vol) {
+    setAuxVolGeneric(port, 2, 3, vol);
+}
+
+void wss_mixer_getAux1Vol(u16 port,       wss_vol *vol) {
+    getAuxVolGeneric(port, 2, 3, vol);
+}
+
+void wss_mixer_setAux2Vol(u16 port, const wss_vol *vol) {
+    setAuxVolGeneric(port, 4, 5, vol);
+}
+
+void wss_mixer_getAux2Vol(u16 port,       wss_vol *vol) {
+    getAuxVolGeneric(port, 4, 5, vol);
+}
+
+void wss_mixer_setLineVol(u16 port, const wss_vol *vol) {
+    setAuxVolGeneric(port, 18, 19, vol);
+}
+
+void wss_mixer_getLineVol(u16 port,       wss_vol *vol) {
+    getAuxVolGeneric(port, 18, 19, vol);
+}
+
+void wss_mixer_setRecVol(u16 port, const wss_vol *vol) {
+    u8 lreg = wss_indirectRegRead(port, 0);
+    u8 rreg = wss_indirectRegRead(port, 1);
+
+    lreg = (lreg & ~REC_VOL_MASK) | ((vol->l >> 2) & REC_VOL_MASK);
+    rreg = (rreg & ~REC_VOL_MASK) | ((vol->r >> 2) & REC_VOL_MASK);
+
+    if (vol->mute) {
+        printf ("WARNING: Mute not supported on record\n");
+    }
+
+    wss_indirectRegWrite(port, 0, lreg);
+    wss_indirectRegWrite(port, 1, rreg);
+}
+
+void wss_mixer_getRecVol(u16 port,       wss_vol *vol) {
+    u8 lvol = wss_indirectRegRead(port, 0) & AUX_VOL_MASK;
+    u8 rvol = wss_indirectRegRead(port, 1) & AUX_VOL_MASK;
+
+    vol->mute = false;
+    /* This gain is 0-15 so we need to shift it left. 
+       This would yield 60 for max volume so we set it to 63 in that case. */
+    vol->l = (lvol == 0x0F) ? WSS_VOL_MAX : (lvol << 2);
+    vol->r = (rvol == 0x0F) ? WSS_VOL_MAX : (rvol << 2);
+}
+
+void wss_mixer_setMicBoost(u16 port, bool enable) {
+    u8 lreg = wss_indirectRegRead(port, 0);
+    u8 rreg = wss_indirectRegRead(port, 1);
+
+    lreg = (lreg & ~MIC_BOOST) | (enable ? MIC_BOOST : 0x00);
+    rreg = (rreg & ~MIC_BOOST) | (enable ? MIC_BOOST : 0x00);
+
+    wss_indirectRegWrite(port, 0, lreg);
+    wss_indirectRegWrite(port, 1, rreg);
+}
+
+bool wss_mixer_getMicBoost(u16 port) {
+    u8 lreg = wss_indirectRegRead(port, 0) & MIC_BOOST;
+    u8 rreg = wss_indirectRegRead(port, 1) & MIC_BOOST;
+
+    assert (lreg == rreg);
+
+    return lreg != 0;
+}
+
+void wss_mixer_muteVoice (u16 port, bool mute) {
     wss_vol vol;
-    wss_mixer_getOutputVol (port, &vol);
+    wss_mixer_getVoiceVol (port, &vol);
     vol.mute = true;
-    wss_mixer_setOutputVol (port, &vol); 
+    wss_mixer_setVoiceVol (port, &vol);
 }
