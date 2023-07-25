@@ -173,13 +173,15 @@ static bool parseAndSetStr(const args_arg *arg, const char *toParse) {
 }
 
 static bool setFlag(const args_arg *arg) {
-    bool * dstFlag = (bool*) arg->dst;
+    bool *dstFlag = (bool*) arg->dst;
+    bool ok = true;
 
     assert (dstFlag != NULL);
 
-    *dstFlag = true;
+    if (arg->checker) ok = runCheckerStr(arg, dstFlag); /* dst as cheker parameter */
+    if (ok)           *dstFlag = true;
 
-    return true;
+    return ok;
 }
 
 static bool doParse(const args_arg *arg, const char *toParse) {
