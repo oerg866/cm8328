@@ -29,11 +29,11 @@ typedef u8 arg_type;
 typedef bool (*arg_check_fn) (void *); /* The void* argument is a pointer to the value to check */
 
 typedef struct {
-	const char     *prefix;         /* Prefix of the argument's value */
-	const char     *description;    /* Description of the argument */
-	arg_type        type;           /* Argument type (see defines above) */
-	void           *dst;            /* Pointer to where the parsed value will go */
-	arg_check_fn    checker;        /* Pointer to function that checks validity */
+    const char     *prefix;         /* Prefix of the argument's value */
+    const char     *description;    /* Description of the argument */
+    arg_type        type;           /* Argument type (see defines above) */
+    void           *dst;            /* Pointer to where the parsed value will go */
+    arg_check_fn    checker;        /* Pointer to function that checks validity */
 } args_arg;
 
 
@@ -49,11 +49,11 @@ typedef struct {
    Example:
 
 
-	  ARGS_HEADER("Cool Program with cool arguments, version 1"), 
-	 ...
-	  { "asd", "A cool argument", ARG_STR, &sArgument, NULL },
-	  ARGS_EXPLAIN("This argument is so cool that you can't even imagine it!"),
-	 ... 
+      ARGS_HEADER("Cool Program with cool arguments, version 1"), 
+     ...
+      { "asd", "A cool argument", ARG_STR, &sArgument, NULL },
+      ARGS_EXPLAIN("This argument is so cool that you can't even imagine it!"),
+     ... 
 
 */
 
