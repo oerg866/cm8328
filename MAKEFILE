@@ -11,7 +11,7 @@ OBJ = main.obj cm8328.obj wss.obj args.obj
 all : CM8328.EXE
 
 CM8328.EXE : $(OBJ)
-	$(LD) $(LDFLAGS) NAME CM8328.EXE FILE {$(OBJ)}
+    $(LD) $(LDFLAGS) NAME CM8328.EXE FILE {$(OBJ)}
 
 .c.obj : .AUTODEPEND
-		$(CC) $(CFLAGS) -fo=$@ $<
+        $(CC) $(CFLAGS) -fo=$@ $<
