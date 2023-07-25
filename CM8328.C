@@ -571,7 +571,7 @@ static bool getCurrentMixer(u16 port, cm8328_mixer *dst) {
     wss_mixer_getAux1Vol    (port, &(dst->o_cd));
     wss_mixer_getAux2Vol    (port, &(dst->o_synth));
     wss_mixer_getLineVol    (port, &(dst->o_line));
-    wss_mixer_getVoiceVol   (port, &(dst->i_rec));
+    wss_mixer_getRecVol     (port, &(dst->i_rec));
 
     dst->recSource = wss_mixer_getInputSource(port);
     dst->micBoost  = wss_mixer_getMicBoost   (port);
