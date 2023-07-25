@@ -90,7 +90,7 @@ void args_printUsage(const args_arg *argList, size_t argCount) {
 
             printf("%*s%-*s - %s - %s\n",
                     10, tmp,
-                    5, (argList[idx].type == ARG_FLAG) ? " ": ":<...>",
+                    6, (argList[idx].type == ARG_FLAG) ? "": ":<...>",
                     getArgTypeName(argList[idx].type),
                     argList[idx].description
 
