@@ -462,8 +462,8 @@ static bool initCard (u16 port) {
     /* Official driver first sets SB disabled, then clears disable bit.
        Doing this to maximize compatibility... */
 
-    /* Initialize WSS codec (TODO: Make this more elegant)
-    /* Info from CS4231 codec datasheet & reverse engineering official driver */
+    /* Initialize WSS codec. Info from CS4231 codec datasheet 
+       & reverse engineering official driver */
 
     /* firstly verify we can access it */
     mixerAccessPre(port);
