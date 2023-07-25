@@ -1,0 +1,17 @@
+CC = wcc
+AS = wasm
+LD = wlink
+CL = wcl
+
+CFLAGS = -3 -bt=dos
+LDFLAGS = SYSTEM DOS
+
+OBJ = main.obj cm8328.obj wss.obj args.obj
+
+all : CM8328.EXE
+
+CM8328.EXE : $(OBJ)
+	$(LD) $(LDFLAGS) NAME CM8328.EXE FILE {$(OBJ)}
+
+.c.obj : .AUTODEPEND
+		$(CC) $(CFLAGS) -fo=$@ $<
