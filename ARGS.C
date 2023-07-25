@@ -122,7 +122,7 @@ static bool runCheckerNum(const args_arg *arg, u32 *val) {
 }
 
 static bool runCheckerStr(const args_arg *arg, const char *val) {
-    bool ok = (arg->checker) (&val);
+    bool ok = (arg->checker) (val);
 
     if (!ok) {
         printf("ERROR: Value '%s' for parameter '%s' invalid!\n",
