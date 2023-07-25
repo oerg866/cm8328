@@ -201,16 +201,6 @@ static const char s_headerString[] =
     "  (C) 2023 Eric Voirin (oerg866@googlemail.com)\n"
     "  Discord: oerg866, twitter: @oerg866\n";
 
-static void showCurrentConfig();
-
-static u8 getBitField(u8 src, u8 from, u8 to) {
-    return (src >> from) & (0xFF >> (8 - to));
-}
-
-static u8 setBitField(u8 src, u8 from, u8 to, u8 value) {
-    return src | ((value << from) & ~(0xFF << (to + 1)));
-}
-
 static u8 cfgRead(u16 port, u8 reg) {
     outportb(port + 3, 0x43);
     outportb(port + 3, 0x21);
